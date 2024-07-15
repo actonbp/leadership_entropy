@@ -45,9 +45,10 @@ export const TabsTrigger: React.FC<{ value: string; children: React.ReactNode; c
   );
 };
 
-export const TabsContent: React.FC<{ value: string; children: React.ReactNode }> = ({
+export const TabsContent: React.FC<{ value: string; children: React.ReactNode; className?: string }> = ({
   value,
-  children
+  children,
+  className = ''
 }) => {
   const context = useContext(TabsContext);
   if (!context) throw new Error('TabsContent must be used within Tabs');
@@ -56,5 +57,5 @@ export const TabsContent: React.FC<{ value: string; children: React.ReactNode }>
 
   if (activeTab !== value) return null;
 
-  return <div className="tabs-content">{children}</div>;
+  return <div className={`tabs-content ${className}`}>{children}</div>;
 };
