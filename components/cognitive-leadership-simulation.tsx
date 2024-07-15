@@ -125,7 +125,7 @@ const TeamKSAOSimulation = () => {
     return NUM_TEAM_MEMBERS - 1;
   };
 
-  const updateLeadershipPerceptions = (attempter, change) => {
+  const updateLeadershipPerceptions = (attempter: number, change: number) => {
     setLeadershipPerceptions(prev => {
       const newPerceptions = [...prev];
       for (let i = 0; i < NUM_TEAM_MEMBERS; i++) {
