@@ -79,7 +79,7 @@ const TeamKSAOSimulation = () => {
       const completedKsaos = task.requiredKsaos.filter(ksao => ksaos[attempter].includes(ksao));
 
       if (completedKsaos.length > 0) {
-        const newCompletedKsaos = [...new Set([...task.completedKsaos, ...completedKsaos])];
+        const newCompletedKsaos = Array.from(new Set([...task.completedKsaos, ...completedKsaos]));
         setSubtasks(prev => prev.map(t => t.id === task.id ? { ...t, completedKsaos: newCompletedKsaos } : t));
         setLog(prev => [...prev, `Turn ${currentTurn + 1}: Member ${attempter + 1} contributed KSAOs ${completedKsaos.join(', ')} to "${task.description}"`]);
         updateLeadershipPerceptions(attempter, completedKsaos.length / task.requiredKsaos.length);
