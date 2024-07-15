@@ -64,10 +64,10 @@ const TeamKSAOSimulation = () => {
     if (incompleteSubtasks.length > 0) {
       const taskIndex = Math.floor(Math.random() * incompleteSubtasks.length);
       const task = incompleteSubtasks[taskIndex];
-      const completedKsaos = task.requiredKsaos.filter((ksao: string) => ksaos[attempter].includes(ksao));
+      const completedKsaos = task.requiredKsaos.filter(ksao => ksaos[attempter].includes(ksao));
 
       if (completedKsaos.length > 0) {
-        const newCompletedKsaos = Array.from(new Set([...task.completedKsaos, ...completedKsaos]));
+        const newCompletedKsaos = [...new Set([...task.completedKsaos, ...completedKsaos])];
         setSubtasks(prev => prev.map(t => t.id === task.id ? { ...t, completedKsaos: newCompletedKsaos } : t));
         setLog(prev => [...prev, `Turn ${currentTurn + 1}: Member ${attempter + 1} contributed KSAOs ${completedKsaos.join(', ')} to "${task.description}"`]);
         updateLeadershipPerceptions(attempter, completedKsaos.length / task.requiredKsaos.length);
@@ -113,7 +113,7 @@ const TeamKSAOSimulation = () => {
     return NUM_TEAM_MEMBERS - 1;
   };
 
-  const updateLeadershipPerceptions = (attempter: number, change: number) => {
+  const updateLeadershipPerceptions = (attempter, change) => {
     setLeadershipPerceptions(prev => {
       const newPerceptions = [...prev];
       for (let i = 0; i < NUM_TEAM_MEMBERS; i++) {
@@ -238,7 +238,7 @@ const TeamKSAOSimulation = () => {
                   <p className="mb-1">Required KSAOs: {task.requiredKsaos.join(', ')}</p>
                   <p className="mb-2">Completed KSAOs: {task.completedKsaos.join(', ') || 'None'}</p>
                   <div className="flex space-x-2">
-                    {task.requiredKsaos.map((ksao: string, index: number) => (
+                    {task.requiredKsaos.map((ksao, index) => (
                       <div
                         key={index}
                         className={`w-8 h-8 flex items-center justify-center rounded-md text-sm font-medium
