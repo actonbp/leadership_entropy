@@ -21,8 +21,8 @@ export const Tabs: React.FC<{ defaultValue: string; children: React.ReactNode; c
   );
 };
 
-export const TabsList: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return <div className="flex border-b">{children}</div>;
+export const TabsList: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => {
+  return <div className={`flex border-b ${className}`}>{children}</div>;
 };
 
 export const TabsTrigger: React.FC<{ value: string; children: React.ReactNode }> = ({
