@@ -7,14 +7,26 @@ const NUM_TEAM_MEMBERS = 4;
 const NUM_SUBTASKS = 8;
 const KSAO_TYPES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
+interface Subtask {
+  id: number;
+  description: string;
+  requiredKsaos: string[];
+  completedKsaos: string[];
+}
+
+interface PerformanceData {
+  turn: number;
+  score: number;
+}
+
 const TeamKSAOSimulation = () => {
-  const [leadershipPerceptions, setLeadershipPerceptions] = useState([]);
-  const [ksaos, setKsaos] = useState([]);
-  const [subtasks, setSubtasks] = useState([]);
-  const [completedSubtasks, setCompletedSubtasks] = useState([]);
+  const [leadershipPerceptions, setLeadershipPerceptions] = useState<number[][]>([]);
+  const [ksaos, setKsaos] = useState<string[][]>([]);
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [completedSubtasks, setCompletedSubtasks] = useState<Subtask[]>([]);
   const [currentTurn, setCurrentTurn] = useState(0);
-  const [performance, setPerformance] = useState([]);
-  const [log, setLog] = useState([]);
+  const [performance, setPerformance] = useState<PerformanceData[]>([]);
+  const [log, setLog] = useState<string[]>([]);
 
   useEffect(() => {
     initializeSimulation();
@@ -37,7 +49,7 @@ const TeamKSAOSimulation = () => {
     setKsaos(newKsaos);
 
     // Initialize subtasks
-    const newSubtasks = [
+    const newSubtasks: Subtask[] = [
       { id: 0, description: "Analyze Data", requiredKsaos: ['A', 'B'], completedKsaos: [] },
       { id: 1, description: "Develop Strategy", requiredKsaos: ['A', 'D', 'E'], completedKsaos: [] },
       { id: 2, description: "Implement Solution", requiredKsaos: ['C', 'D', 'F'], completedKsaos: [] },
