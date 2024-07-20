@@ -205,9 +205,18 @@ const TeamKSAOSimulation = () => {
   };
 
   const calculateEntropy = () => {
-    const totalPerceptions = getTotalLeadershipPerceptions();
-    const totalSum = totalPerceptions.reduce((sum, member) => sum + member.totalPerception, 0);
-    const probabilities = totalPerceptions.map(member => member.totalPerception / totalSum);
+    const taskLeadershipClarity = subtasks.map(task => {
+      const contributor = performance.find(p => p.taskDescription === task.description)?.completedBy;
+      if (!contributor) return 0;
+
+      const perceptions = leadershipPerceptions.map(row => row[contributor - 1]);
+      const mean = perceptions.reduce((sum, val) => sum + val, 0) / NUM_TEAM_MEMBERS;
+      const variance = perceptions.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / NUM_TEAM_MEMBERS;
+      return 1 / (1 + variance); // Higher value means clearer leadership
+    });
+
+    const totalClarity = taskLeadershipClarity.reduce((sum, val) => sum + val, 0);
+    const probabilities = taskLeadershipClarity.map(clarity => clarity / totalClarity);
     
     const entropyValue = -probabilities.reduce((sum, p) => {
       if (p === 0) return sum;
@@ -246,8 +255,9 @@ const TeamKSAOSimulation = () => {
         <span className="ml-6 font-semibold text-gray-700">Completed Subtasks:</span> {completedSubtasks.length} / {NUM_SUBTASKS}
       </div>
 
-      <Tabs defaultValue="performance" className="w-full">
+      <Tabs defaultValue="introduction" className="w-full">
         <TabsList className="mb-4 bg-white p-2 rounded-lg shadow-sm">
+          <TabsTrigger value="introduction" className="px-4 py-2 text-sm font-medium">Introduction</TabsTrigger>
           <TabsTrigger value="performance" className="px-4 py-2 text-sm font-medium">Performance</TabsTrigger>
           <TabsTrigger value="perceptions" className="px-4 py-2 text-sm font-medium">Leadership Perceptions</TabsTrigger>
           <TabsTrigger value="ksaos" className="px-4 py-2 text-sm font-medium">Team KSAOs</TabsTrigger>
@@ -255,6 +265,30 @@ const TeamKSAOSimulation = () => {
           <TabsTrigger value="log" className="px-4 py-2 text-sm font-medium">Simulation Log</TabsTrigger>
           <TabsTrigger value="entropy">Entropy</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="introduction" className="bg-white p-6 rounded-lg shadow-card">
+          <h2 className="text-2xl font-bold mb-4">Welcome to the Team Leadership and KSAO Simulation</h2>
+          <p className="mb-4">
+            This simulation explores the dynamics of team leadership and the impact of Knowledge, Skills, Abilities, and Other characteristics (KSAOs) on team performance and leadership emergence.
+          </p>
+          <h3 className="text-xl font-semibold mb-2">How it works:</h3>
+          <ol className="list-decimal list-inside mb-4">
+            <li className="mb-2">The simulation starts with a team of {NUM_TEAM_MEMBERS} members, each with unique KSAOs.</li>
+            <li className="mb-2">There are {NUM_SUBTASKS} subtasks to complete, each requiring specific KSAOs.</li>
+            <li className="mb-2">In each turn, a team member attempts to contribute to a subtask based on their KSAOs.</li>
+            <li className="mb-2">Leadership perceptions change based on successful contributions and team dynamics.</li>
+            <li className="mb-2">The simulation tracks performance, leadership perceptions, and leadership entropy over time.</li>
+          </ol>
+          <h3 className="text-xl font-semibold mb-2">Key Concepts:</h3>
+          <ul className="list-disc list-inside mb-4">
+            <li className="mb-2"><strong>Shared Leadership:</strong> Toggle this option to see how it affects team dynamics and performance.</li>
+            <li className="mb-2"><strong>Leadership Entropy:</strong> Measures the uncertainty in leadership distribution. Higher entropy indicates more shared or uncertain leadership.</li>
+            <li className="mb-2"><strong>Performance:</strong> Tracks the team's progress in completing subtasks over time.</li>
+          </ul>
+          <p>
+            Use the tabs above to explore different aspects of the simulation, and use the "Run Simulation Step" button to progress through the simulation.
+          </p>
+        </TabsContent>
 
         <TabsContent value="performance" className="bg-white p-6 rounded-lg shadow-card">
           <h2 className="text-2xl font-bold mb-4">Team Performance Over Time</h2>
@@ -271,6 +305,9 @@ const TeamKSAOSimulation = () => {
               <ReferenceLine y={Math.log2(NUM_TEAM_MEMBERS)} yAxisId="right" label="Max Entropy" stroke="red" strokeDasharray="3 3" />
             </LineChart>
           </ResponsiveContainer>
+          <p className="mt-4">
+            Entropy measures the uncertainty in leadership distribution. Low entropy indicates clear leadership, while high entropy suggests shared or uncertain leadership. The maximum possible entropy is log2({NUM_TEAM_MEMBERS}) ≈ {Math.log2(NUM_TEAM_MEMBERS).toFixed(2)}.
+          </p>
         </TabsContent>
 
         <TabsContent value="perceptions" className="bg-white p-6 rounded-lg shadow-card">
