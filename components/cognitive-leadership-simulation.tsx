@@ -1,28 +1,31 @@
+// Import necessary React hooks and UI components
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Switch } from '@/components/ui/switch';
 
+// Constants for simulation parameters
 const NUM_TEAM_MEMBERS = 4;
 const NUM_SUBTASKS = 8;
 const KSAO_TYPES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 
+// Interface for a subtask in the simulation
 interface Subtask {
   id: number;
   description: string;
-  requiredKsaos: string[];
-  completedKsaos: string[];
+  requiredKsaos: string[];  // KSAOs required to complete the subtask
+  completedKsaos: string[]; // KSAOs that have been applied to the subtask
 }
 
+// Interface for performance data collected during the simulation
 interface PerformanceData {
   turn: number;
   score: number;
   completedBy: number;
   taskDescription: string;
-  entropy: number;
+  entropy: number; // Measure of leadership distribution
 }
-
 const TeamKSAOSimulation = () => {
   const [leadershipPerceptions, setLeadershipPerceptions] = useState<number[][]>([]);
   const [ksaos, setKsaos] = useState<string[][]>([]);
@@ -87,9 +90,17 @@ const TeamKSAOSimulation = () => {
     setPerformance([]);
     setLog(["Simulation started. Member 1 has the majority of important KSAOs, but this is unknown to the team."]);
     setSelfPerception(perceptions.map((row, index) => row[index]));
-    setParticipationProbability(Array(NUM_TEAM_MEMBERS).fill(1 / NUM_TEAM_MEMBERS));
-    setEntropy(0);
-    setSharedLeadership(false);
+
+    if (sharedLeadership) {
+      setParticipationProbability(Array(NUM_TEAM_MEMBERS).fill(1 / NUM_TEAM_MEMBERS));
+      setLog(prev => [...prev, "Shared Leadership mode: All team members are equally likely to participate."]);
+    } else {
+      const initialProbabilities = [0.4, 0.3, 0.2, 0.1]; // Favoring the member with more KSAOs
+      setParticipationProbability(initialProbabilities);
+      setLog(prev => [...prev, "Traditional Leadership mode: Some members are more likely to lead initially."]);
+    }
+
+    setEntropy(calculateEntropy());
   };
 
   const determineAttempter = () => {
@@ -115,11 +126,12 @@ const TeamKSAOSimulation = () => {
           : -0.1 + (Math.random() * 0.1 - 0.05);
         
         if (sharedLeadership) {
-          // Increase change for non-attempters to promote shared leadership
-          if (i !== attempter) {
+          // In shared leadership, perceptions change more slowly and are more balanced
+          change *= 0.5;
+        } else {
+          // In traditional leadership, perceptions change faster for the attempter
+          if (i === attempter) {
             change *= 1.5;
-          } else {
-            change *= 0.5;
           }
         }
         
@@ -128,22 +140,19 @@ const TeamKSAOSimulation = () => {
       return newPerceptions;
     });
 
-    setSelfPerception(prev => {
-      const newSelfPerception = [...prev];
-      const change = success
-        ? (completedKsaos.length / individualPreferences[attempter].length) + (Math.random() * 0.2 - 0.1)
-        : -0.1 + (Math.random() * 0.1 - 0.05);
-      newSelfPerception[attempter] = Math.max(1, Math.min(10, newSelfPerception[attempter] + change));
-      return newSelfPerception;
-    });
-
+    // Update participation probability
     setParticipationProbability(prev => {
-      const totalPerception = leadershipPerceptions.reduce((sum, row) => sum + row[attempter], 0);
-      const newProbabilities = prev.map((p, i) => 
-        i === attempter ? p * (1 + (success ? completedKsaos.length / 10 : -0.05)) : p * (1 - (success ? completedKsaos.length / 20 : -0.025))
-      );
-      const sum = newProbabilities.reduce((a, b) => a + b, 0);
-      return newProbabilities.map(p => p / sum);
+      if (sharedLeadership) {
+        // In shared leadership, probabilities remain more balanced
+        return prev.map(p => 0.9 * p + 0.1 * (1 / NUM_TEAM_MEMBERS));
+      } else {
+        // In traditional leadership, probabilities change based on performance
+        const newProbabilities = prev.map((p, i) => 
+          i === attempter ? p * (1 + (success ? 0.1 : -0.05)) : p * (1 - (success ? 0.05 : -0.025))
+        );
+        const sum = newProbabilities.reduce((a, b) => a + b, 0);
+        return newProbabilities.map(p => p / sum);
+      }
     });
   };
 
@@ -205,49 +214,77 @@ const TeamKSAOSimulation = () => {
   };
 
   const calculateEntropy = () => {
-    const taskLeadershipClarity = subtasks.map(task => {
+    const taskLeadershipData = subtasks.map(task => {
       const contributor = performance.find(p => p.taskDescription === task.description)?.completedBy;
-      if (!contributor) return 0;
+      if (!contributor) return { ELC: 0, IC: 0, progress: 0 };
 
-      const perceptions = leadershipPerceptions.map(row => row[contributor - 1]);
-      const mean = perceptions.reduce((sum, val) => sum + val, 0) / NUM_TEAM_MEMBERS;
-      const variance = perceptions.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / NUM_TEAM_MEMBERS;
-      return 1 / (1 + variance); // Higher value means clearer leadership
+      // Calculate External Leadership Clarity (ELC)
+      const leadershipScores = leadershipPerceptions.map(row => row[contributor - 1]);
+      const ELC = 1 / leadershipScores.reduce((sum, score) => sum + Math.pow(score, 2), 0);
+
+      // Calculate Internal Consensus (IC)
+      const mean = leadershipScores.reduce((sum, score) => sum + score, 0) / NUM_TEAM_MEMBERS;
+      const variance = leadershipScores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / NUM_TEAM_MEMBERS;
+      const maxPossibleVariance = Math.pow(10 - 1, 2) / 4; // Assuming scores range from 1 to 10
+      const IC = 1 - (variance / maxPossibleVariance);
+
+      // Calculate task progress
+      const progress = task.completedKsaos.length / task.requiredKsaos.length;
+
+      return { ELC, IC, progress };
     });
 
-    const totalClarity = taskLeadershipClarity.reduce((sum, val) => sum + val, 0);
-    const probabilities = taskLeadershipClarity.map(clarity => clarity / totalClarity);
+    const overallProgress = subtasks.reduce((sum, task) => sum + task.completedKsaos.length, 0) / 
+                            subtasks.reduce((sum, task) => sum + task.requiredKsaos.length, 0);
+
+    const totalProduct = taskLeadershipData.reduce((sum, { ELC, IC, progress }) => sum + ELC * IC * (1 - progress), 0);
     
-    const entropyValue = -probabilities.reduce((sum, p) => {
-      if (p === 0) return sum;
-      return sum + p * Math.log2(p);
+    let entropyValue = taskLeadershipData.reduce((sum, { ELC, IC, progress }) => {
+      const probability = (ELC * IC * (1 - progress)) / totalProduct;
+      if (probability === 0) return sum;
+      return sum - probability * Math.log2(probability);
     }, 0);
+
+    // Adjust entropy based on overall progress and leadership style
+    const progressFactor = 1 - Math.pow(overallProgress, 0.5); // Slower decrease at the beginning
+    const leadershipFactor = sharedLeadership ? 0.9 : 0.7; // Shared leadership maintains higher entropy
+
+    entropyValue = entropyValue * progressFactor * leadershipFactor;
+
+    // Normalize entropy to be between 0 and 1
+    const normalizedEntropy = entropyValue / Math.log2(NUM_SUBTASKS);
     
-    setEntropy(entropyValue);
-    return entropyValue;
+    setEntropy(normalizedEntropy);
+    return normalizedEntropy;
   };
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <h1 className="text-4xl font-bold mb-6 text-gray-800">Complex Team KSAO and Mission Completion Simulation</h1>
       
+      <div className="mb-6 p-4 bg-blue-100 rounded-lg">
+        <h3 className="text-xl font-semibold mb-2">Choose Leadership Style:</h3>
+        <div className="flex items-center space-x-2">
+          <Switch
+            id="shared-leadership"
+            checked={sharedLeadership}
+            onCheckedChange={setSharedLeadership}
+          />
+          <label htmlFor="shared-leadership" className="font-medium">
+            Shared Leadership
+          </label>
+        </div>
+        <p className="mt-2 text-sm">
+          Shared Leadership: A team where leadership is distributed among members. Each person is equally likely to take on leadership roles. These teams may have higher entropy initially but can develop unique strengths over time.
+        </p>
+        <p className="mt-2 text-sm">
+          Traditional Leadership: A team where clear leaders emerge for specific tasks. These teams may have lower entropy and complete tasks faster initially, but may lack flexibility.
+        </p>
+      </div>
+
       <div className="mb-6 space-x-4">
         <Button onClick={runSimulationStep} className="bg-primary hover:bg-blue-600">Run Simulation Step</Button>
         <Button onClick={initializeSimulation} className="bg-secondary hover:bg-green-600">Reset Simulation</Button>
-      </div>
-
-      <div className="mb-6 flex items-center space-x-4">
-        <span>Shared Leadership:</span>
-        <Switch
-          checked={sharedLeadership}
-          onCheckedChange={setSharedLeadership}
-          disabled={currentTurn > 0}
-        />
-        {currentTurn > 0 && (
-          <span className="text-sm text-gray-500">
-            (Locked after simulation starts)
-          </span>
-        )}
       </div>
 
       <div className="mb-6 p-4 bg-white rounded-lg shadow-card">
@@ -285,6 +322,26 @@ const TeamKSAOSimulation = () => {
             <li className="mb-2"><strong>Leadership Entropy:</strong> Measures the uncertainty in leadership distribution. Higher entropy indicates more shared or uncertain leadership.</li>
             <li className="mb-2"><strong>Performance:</strong> Tracks the team's progress in completing subtasks over time.</li>
           </ul>
+          <h3 className="text-xl font-semibold mb-2">Understanding Leadership Entropy:</h3>
+          <p className="mb-4">
+            Leadership Entropy in this simulation measures the effectiveness of shared leadership within the team. Lower entropy indicates more effective leadership, where:
+          </p>
+          <ul className="list-disc list-inside mb-4">
+            <li className="mb-2">There are clear leaders for specific subtasks (high External Leadership Clarity)</li>
+            <li className="mb-2">The team agrees on who these leaders are (high Internal Consensus)</li>
+            <li className="mb-2">This pattern is consistent across different subtasks</li>
+          </ul>
+          <p className="mb-4">
+            Higher entropy suggests less effective leadership, which can occur when:
+          </p>
+          <ul className="list-disc list-inside mb-4">
+            <li className="mb-2">Leadership is evenly distributed among all team members for subtasks</li>
+            <li className="mb-2">There's disagreement about who is leading</li>
+            <li className="mb-2">The leadership structure varies widely between subtasks</li>
+          </ul>
+          <p className="mb-4">
+            This approach recognizes that effective shared leadership doesn't mean everyone leads all the time, but rather that leadership is clearly distributed among team members for different subtasks, with strong agreement about these roles.
+          </p>
           <p>
             Use the tabs above to explore different aspects of the simulation, and use the "Run Simulation Step" button to progress through the simulation.
           </p>
@@ -306,7 +363,7 @@ const TeamKSAOSimulation = () => {
             </LineChart>
           </ResponsiveContainer>
           <p className="mt-4">
-            Entropy measures the uncertainty in leadership distribution. Low entropy indicates clear leadership, while high entropy suggests shared or uncertain leadership. The maximum possible entropy is log2({NUM_TEAM_MEMBERS}) ≈ {Math.log2(NUM_TEAM_MEMBERS).toFixed(2)}.
+            Entropy measures the uncertainty in leadership distribution. In shared leadership teams, entropy tends to remain higher as leadership is more evenly distributed. In traditional leadership teams, entropy typically decreases over time as clear leaders emerge for specific tasks. Lower entropy indicates more defined leadership roles, while higher entropy suggests more distributed leadership.
           </p>
         </TabsContent>
 
@@ -420,7 +477,7 @@ const TeamKSAOSimulation = () => {
             </LineChart>
           </ResponsiveContainer>
           <p className="mt-4">
-            Entropy measures the uncertainty in leadership distribution. Low entropy indicates clear leadership, while high entropy suggests shared or uncertain leadership. The maximum possible entropy is log2({NUM_TEAM_MEMBERS}) ≈ {Math.log2(NUM_TEAM_MEMBERS).toFixed(2)}.
+            Entropy measures the uncertainty in leadership distribution. In shared leadership teams, entropy tends to remain higher as leadership is more evenly distributed. In traditional leadership teams, entropy typically decreases over time as clear leaders emerge for specific tasks. Lower entropy indicates more defined leadership roles, while higher entropy suggests more distributed leadership.
           </p>
         </TabsContent>
       </Tabs>
